@@ -2,6 +2,37 @@
 
 An AI-powered video editing agent that automatically transcribes videos, processes scripts, and creates intelligent video cuts based on the content. The agent uses OpenAI's Whisper for transcription and GPT-4 for intelligent editing decisions, delivering a streamlined Streamlit interface for easy video processing.
 
+## ⚠️ Important Requirements
+
+### FFmpeg Installation
+
+This application requires **FFmpeg** to be installed on your system for video processing capabilities. MoviePy depends on FFmpeg for video and audio manipulation.
+
+#### Installation Instructions:
+
+**macOS:**
+```bash
+brew install ffmpeg
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install ffmpeg
+```
+
+**Windows:**
+1. Download FFmpeg from [https://ffmpeg.org/download.html](https://ffmpeg.org/download.html)
+2. Extract the files and add the `bin` folder to your system PATH
+3. Alternatively, use Chocolatey: `choco install ffmpeg`
+
+**Verification:**
+```bash
+ffmpeg -version
+```
+
+> **Note**: The application will not function properly without FFmpeg installed. Ensure FFmpeg is accessible from your command line before running the video editing agent.
+
 ## 🎯 Use Cases
 
 This AI agent is designed for content creators, educators, and video professionals who need to:
