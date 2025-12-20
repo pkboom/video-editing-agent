@@ -1,4 +1,9 @@
 [server]
 # Maximum file upload size in MB (default is 200MB)
 maxUploadSize = 1024
+# Do not launch a browser window/tab when the app starts; it runs the server only.
+headless = true
 
+[browser]
+# Turns off Streamlit’s anonymous usage telemetry
+gatherUsageStats = false

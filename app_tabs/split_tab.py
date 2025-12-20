@@ -1,5 +1,6 @@
 import asyncio
 import time
+import traceback
 from pathlib import Path
 
 import streamlit as st
@@ -128,7 +129,9 @@ async def split_video(uploaded_file, num_parts: int):
 
     except Exception as e:
         st.error(f"❌ Error splitting video: {str(e)}")
-        st.write("Please check the file format and try again.")
+        trace_lines = traceback.format_exception(type(e), e, e.__traceback__)
+        st.code("".join(trace_lines[:6]))
+
     finally:
         if video_clip is not None:
             video_clip.close()

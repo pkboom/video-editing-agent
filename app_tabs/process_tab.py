@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+import traceback
 
 import streamlit as st
 
@@ -152,4 +153,5 @@ async def process_video(uploaded_file, user_script: str):
 
     except Exception as e:
         st.error(f"❌ Error processing video: {str(e)}")
-        st.write("Please check the file format and try again.")
+        trace_lines = traceback.format_exception(type(e), e, e.__traceback__)
+        st.code("".join(trace_lines[:6]))
