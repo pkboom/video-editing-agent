@@ -1,24 +1,4 @@
 [server]
 # Maximum file upload size in MB (default is 200MB)
-maxUploadSize = 10000
+maxUploadSize = 1024
 
-# Enable file watcher for hot reloading during development
-fileWatcherType = "auto"
-
-# Port configuration
-port = 8501
-
-[browser]
-# Automatically open browser when starting the app
-gatherUsageStats = false
-
-[theme]
-# Optional: Set a custom theme
-# primaryColor = "#FF6B6B"
-# backgroundColor = "#FFFFFF"
-# secondaryBackgroundColor = "#F0F2F6"
-# textColor = "#262730"
-
-[logger]
-# Set logging level
-level = "info"

@@ -1,4 +1,0 @@
-streamlit
-openai
-moviepy
-openai-agents
