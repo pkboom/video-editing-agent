@@ -154,4 +154,5 @@ async def process_video(uploaded_file, user_script: str):
     except Exception as e:
         st.error(f"❌ Error processing video: {str(e)}")
         trace_lines = traceback.format_exception(type(e), e, e.__traceback__)
-        st.code("".join(trace_lines[:6]))
+        if hasattr(st, "code"):
+            st.code("".join(trace_lines[:6]))

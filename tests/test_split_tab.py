@@ -107,70 +107,55 @@ class FakeSegment:
         self.parent.closed_segments.append((self.start, self.end))
 
 
-def setup_split_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, duration: float):
+def setup_cut_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, duration: float):
     st_stub = StreamlitStub()
-    st_stub.session_state["split_zip_file_path"] = "old.zip"
+    st_stub.session_state["cut_file_path"] = "old.mp4"
 
     fake_clip = FakeClip(duration)
 
-    async def fake_zip(exports_directory: str, temp_directory: str) -> str:
-        zip_path = Path(temp_directory) / "fake.zip"
-        zip_path.write_bytes(b"zip-bytes")
-        return str(zip_path)
-
     monkeypatch.setattr(split_tab, "st", st_stub)
     monkeypatch.setattr(split_tab, "VideoFileClip", lambda _: fake_clip)
-    monkeypatch.setattr(split_tab, "zip_and_download_files", fake_zip)
     monkeypatch.chdir(tmp_path)
 
     return st_stub, fake_clip
 
 
-def test_split_video_writes_segments_and_zip(
+def test_cut_video_range_writes_clip_and_download(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    st_stub, fake_clip = setup_split_env(monkeypatch, tmp_path, duration=10)
+    st_stub, fake_clip = setup_cut_env(monkeypatch, tmp_path, duration=10)
     uploaded_file = UploadedFileStub("demo.mp4", b"file-bytes")
 
-    asyncio.run(split_tab.split_video(uploaded_file, 3))
+    asyncio.run(split_tab.cut_video_range(uploaded_file, 2, 5))
 
     exports_dirs = list((tmp_path / "exports").iterdir())
     assert len(exports_dirs) == 1
     run_dir = exports_dirs[0]
-    part_names = sorted(path.name for path in run_dir.iterdir())
-    assert part_names == [
-        "split_demo.mp4_part_01.mp4",
-        "split_demo.mp4_part_02.mp4",
-        "split_demo.mp4_part_03.mp4",
-    ]
+    files = list(run_dir.glob("*.mp4"))
+    assert len(files) == 1
 
-    assert fake_clip.subclip_calls[0][0] == 0
-    assert fake_clip.subclip_calls[0][1] == pytest.approx(10 / 3)
-    assert fake_clip.subclip_calls[1][0] == pytest.approx(10 / 3)
-    assert fake_clip.subclip_calls[1][1] == pytest.approx(20 / 3)
-    assert fake_clip.subclip_calls[2][0] == pytest.approx(20 / 3)
-    assert fake_clip.subclip_calls[2][1] == 10
-    assert len(fake_clip.closed_segments) == 3
+    assert fake_clip.subclip_calls == [(2, 5)]
+    assert fake_clip.closed_segments == [(2, 5)]
     assert fake_clip.closed is True
 
-    assert st_stub.session_state["split_zip_file_path"].endswith("fake.zip")
-    assert st_stub.downloads[-1]["file_name"] == "split_files.zip"
-    assert st_stub.downloads[-1]["data"] == b"zip-bytes"
-    assert "old.zip" not in st_stub.session_state.values()
+    assert st_stub.session_state["cut_file_path"].endswith(".mp4")
+    assert st_stub.downloads[-1]["file_name"] == files[0].name
+    assert st_stub.downloads[-1]["data"] == b"segment"
+    assert "old.mp4" not in st_stub.session_state.values()
 
     assert not st_stub.errors
     assert st_stub.successes
 
 
-def test_split_video_handles_zero_duration(
+def test_cut_video_range_handles_zero_duration(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    st_stub, fake_clip = setup_split_env(monkeypatch, tmp_path, duration=0)
+    st_stub, fake_clip = setup_cut_env(monkeypatch, tmp_path, duration=0)
     uploaded_file = UploadedFileStub("demo.mp4", b"file-bytes")
 
-    asyncio.run(split_tab.split_video(uploaded_file, 2))
+    asyncio.run(split_tab.cut_video_range(uploaded_file, 0, 1))
 
     assert any("no duration" in err.lower() for err in st_stub.errors)
-    assert "split_zip_file_path" not in st_stub.session_state
+    assert "cut_file_path" not in st_stub.session_state
     assert not st_stub.downloads
     assert fake_clip.closed is True

@@ -6,47 +6,91 @@ from pathlib import Path
 import streamlit as st
 from moviepy import VideoFileClip
 
-from lib.download import zip_and_download_files
-
 
 def render_split_tab() -> None:
-    st.subheader("Split Video Evenly")
+    st.subheader("Cut Video By Timestamps")
     split_file = st.file_uploader(
-        "Choose a video file to split",
+        "Choose a video file",
         type=["mp4", "avi", "mov", "mkv", "wmv", "flv", "webm"],
         key="split_video_file",
-        help="Select the video you want to break into equal parts",
+        help="Select the video you want to cut",
     )
 
-    num_parts = st.number_input(
-        "Number of segments",
-        min_value=2,
-        max_value=20,
-        value=2,
-        step=1,
-        help="Choose how many equal parts to create",
+    start_ts = st.text_input(
+        "Start time (e.g., 00:01:30 or 90)",
+        key="split_start_ts",
+        help="When cutting by timestamps, this is the starting position",
+    )
+    end_ts = st.text_input(
+        "End time (e.g., 00:02:45 or 165)",
+        key="split_end_ts",
+        help="When cutting by timestamps, this is the end position",
     )
 
     split_disabled = split_file is None
 
     if st.button(
-        "✂️ Split Video",
+        "🎯 Cut By Timestamps",
         disabled=split_disabled,
-        help="Split the selected video into equal parts",
-        key="split_video_run",
+        help="Export a single clip between the provided start and end times",
+        key="cut_video_run",
     ):
-        if split_file is not None:
-            asyncio.run(split_video(split_file, int(num_parts)))
-        else:
+        if split_file is None:
             st.error("Please select a file first!")
+            return
+
+        try:
+            start_seconds = parse_timestamp_to_seconds(start_ts)
+            end_seconds = parse_timestamp_to_seconds(end_ts)
+        except ValueError as parse_err:
+            st.error(str(parse_err))
+            return
+
+        if end_seconds <= start_seconds:
+            st.error("End time must be greater than start time.")
+            return
+
+        asyncio.run(cut_video_range(split_file, start_seconds, end_seconds))
 
 
-async def split_video(uploaded_file, num_parts: int):
-    """Split the uploaded video into equal parts and prepare a download."""
+def parse_timestamp_to_seconds(value: str) -> float:
+    value = value.strip()
+    if not value:
+        raise ValueError("Please enter a time in seconds or HH:MM:SS format.")
+
+    if value.isdigit() or _looks_like_float(value):
+        return float(value)
+
+    parts = value.split(":")
+    if not 1 <= len(parts) <= 3:
+        raise ValueError("Invalid time format; use seconds or HH:MM:SS.")
+
+    try:
+        parts = [float(p) for p in parts]
+    except ValueError:
+        raise ValueError("Invalid time format; use seconds or HH:MM:SS.")
+
+    while len(parts) < 3:
+        parts.insert(0, 0.0)
+
+    hours, minutes, seconds = parts
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def _looks_like_float(text: str) -> bool:
+    try:
+        float(text)
+        return True
+    except ValueError:
+        return False
+
+
+async def cut_video_range(uploaded_file, start_seconds: float, end_seconds: float):
+    """Cut a single clip between start and end times and offer it for download."""
     temp_dir = Path("temp")
     temp_dir.mkdir(exist_ok=True)
 
-    st.session_state.pop("split_zip_file_path", None)
+    st.session_state.pop("cut_file_path", None)
 
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -54,15 +98,15 @@ async def split_video(uploaded_file, num_parts: int):
     status_text.text("Saving uploaded file...")
     progress_bar.progress(0.1)
 
-    temp_video_path = temp_dir / f"split_{uploaded_file.name}"
+    temp_video_path = temp_dir / f"cut_{uploaded_file.name}"
     with open(temp_video_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
     video_clip = None
-    run_dir = None
+    output_path = None
 
     try:
-        status_text.text("Splitting video into equal parts...")
+        status_text.text("Loading video and preparing cut...")
         progress_bar.progress(0.2)
 
         video_clip = VideoFileClip(str(temp_video_path))
@@ -70,67 +114,77 @@ async def split_video(uploaded_file, num_parts: int):
         if duration <= 0:
             raise ValueError("The video has no duration.")
 
-        segment_duration = duration / num_parts
+        if start_seconds < 0 or end_seconds > duration:
+            raise ValueError("Start/end times must be within the video duration.")
+
+        clip = video_clip.subclipped(start_seconds, end_seconds)
 
         exports_dir = Path("exports")
         exports_dir.mkdir(exist_ok=True)
-        run_dir = exports_dir / f"splits_{temp_video_path.stem}_{int(time.time())}"
+        run_dir = exports_dir / f"cuts_{temp_video_path.stem}_{int(time.time())}"
         run_dir.mkdir(parents=True, exist_ok=True)
 
-        for idx in range(num_parts):
-            start_time = idx * segment_duration
-            end_time = (
-                duration if idx == num_parts - 1 else (idx + 1) * segment_duration
-            )
+        output_path = (
+            run_dir
+            / f"{temp_video_path.stem}_{int(start_seconds)}-{int(end_seconds)}.mp4"
+        )
 
-            if start_time >= end_time:
-                continue
-
-            clip = video_clip.subclipped(start_time, end_time)
-            segment_path = run_dir / f"{temp_video_path.stem}_part_{idx + 1:02d}.mp4"
+        def _write_segment(with_audio: bool) -> None:
             clip.write_videofile(
-                str(segment_path),
+                str(output_path),
                 codec="libx264",
-                audio_codec="aac",
-                temp_audiofile=str(temp_dir / "temp-audio.m4a"),
+                audio=with_audio,
+                audio_codec="aac" if with_audio else None,
+                temp_audiofile=str(temp_dir / "temp-audio.m4a") if with_audio else None,
                 remove_temp=True,
                 logger=None,
             )
+
+        try:
+            _write_segment(with_audio=True)
+        except AttributeError as attr_err:
+            if "stdout" in str(attr_err):
+                st.warning(
+                    "Audio track failed to process; exporting clip without audio."
+                )
+                _write_segment(with_audio=False)
+            else:
+                raise
+        except Exception as write_err:
+            if "stdout" in str(write_err):
+                st.warning(
+                    "Audio track failed to process; exporting clip without audio."
+                )
+                _write_segment(with_audio=False)
+            else:
+                raise
+        finally:
             clip.close()
 
-            progress_bar.progress(0.2 + 0.6 * ((idx + 1) / num_parts))
+        status_text.text("Preparing download...")
+        progress_bar.progress(0.9)
 
-        status_text.text("Preparing files for download...")
-        progress_bar.progress(0.85)
+        st.session_state.cut_file_path = str(output_path)
+        with open(output_path, "rb") as outf:
+            data = outf.read()
 
-        if run_dir is None:
-            raise ValueError("No split output directory was created.")
-
-        zip_file_path = await zip_and_download_files(str(run_dir), str(temp_dir))
-        st.session_state.split_zip_file_path = zip_file_path
-
-        status_text.text("Split completed successfully!")
+        status_text.text("Cut completed successfully!")
         progress_bar.progress(1.0)
-        st.success("✅ Video split completed successfully!")
+        st.success("✅ Clip exported successfully!")
 
-        if st.session_state.split_zip_file_path:
-            with open(st.session_state.split_zip_file_path, "rb") as zip_file:
-                zip_data = zip_file.read()
-
-            st.download_button(
-                label="Download Split Files",
-                data=zip_data,
-                file_name="split_files.zip",
-                mime="application/zip",
-                help="Click to download the split video files",
-            )
-        else:
-            st.warning("No split files available for download yet.")
+        st.download_button(
+            label="Download Cut Clip",
+            data=data,
+            file_name=output_path.name,
+            mime="video/mp4",
+            help="Click to download the cut clip",
+        )
 
     except Exception as e:
-        st.error(f"❌ Error splitting video: {str(e)}")
+        st.error(f"❌ Error cutting video: {str(e)}")
         trace_lines = traceback.format_exception(type(e), e, e.__traceback__)
-        st.code("".join(trace_lines[:6]))
+        if hasattr(st, "code"):
+            st.code("".join(trace_lines[:6]))
 
     finally:
         if video_clip is not None:
