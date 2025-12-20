@@ -25,7 +25,7 @@ uv sync
 cp .env.example .env
 # OPENAI_API_KEY=openai-api-key
 
-streamlit run main.py
+uv run streamlit run main.py
 ```
 
 # Configuration
