@@ -5,22 +5,23 @@ from pydantic import BaseModel
 
 client = OpenAI()
 
+
 class VideoEdit(BaseModel):
     start: int
     end: int
     targeted_script_snippet: str
+
 
 async def process_transcription_with_llm(transcript_path: str, script: str) -> dict:
     try:
 
         # Get the transcription content from the file
 
-        with open(transcript_path, 'r', encoding='utf-8') as f:
+        with open(transcript_path, "r", encoding="utf-8") as f:
             transcript = f.read()
 
-        transcript = json.loads(transcript)['words'] if transcript else {}
+        transcript = json.loads(transcript)["words"] if transcript else {}
 
-        print(f"Transcription content loaded from {transcript_path}")
         # Process the transcript with the LLM
 
         agent = Agent(
@@ -38,7 +39,7 @@ async def process_transcription_with_llm(transcript_path: str, script: str) -> d
             """,
             tools=[],
             model="gpt-4o",
-            output_type=list[VideoEdit]
+            output_type=list[VideoEdit],
         )
 
         user_prompt = f"""
@@ -53,9 +54,9 @@ async def process_transcription_with_llm(transcript_path: str, script: str) -> d
         result = await Runner.run(agent, user_prompt)
 
         # Handle different result structures
-        if hasattr(result, 'content') and result.content:
+        if hasattr(result, "content") and result.content:
             output_data = result.content
-        elif hasattr(result, 'final_output') and result.final_output:
+        elif hasattr(result, "final_output") and result.final_output:
             output_data = result.final_output
         else:
             return []
@@ -64,7 +65,10 @@ async def process_transcription_with_llm(transcript_path: str, script: str) -> d
         with open("temp/processed_result.json", "w", encoding="utf-8") as f:
             # Convert VideoEdit objects to dict for JSON serialization
             if isinstance(output_data, list):
-                json_data = [edit.dict() if hasattr(edit, 'dict') else edit for edit in output_data]
+                json_data = [
+                    edit.dict() if hasattr(edit, "dict") else edit
+                    for edit in output_data
+                ]
             else:
                 json_data = output_data
             json.dump(json_data, f, ensure_ascii=False, indent=4)

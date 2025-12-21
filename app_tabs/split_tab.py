@@ -16,6 +16,11 @@ def render_split_tab() -> None:
         help="Select the video you want to cut",
     )
 
+    if split_file is not None:
+        st.caption("Preview: use the player timeline to pick timestamps.")
+        st.video(split_file)
+        split_file.seek(0)
+
     start_ts = st.text_input(
         "Start time (e.g., 00:01:30 or 90)",
         key="split_start_ts",
@@ -30,7 +35,7 @@ def render_split_tab() -> None:
     split_disabled = split_file is None
 
     if st.button(
-        "🎯 Cut By Timestamps",
+        "🎯 Cut",
         disabled=split_disabled,
         help="Export a single clip between the provided start and end times",
         key="cut_video_run",

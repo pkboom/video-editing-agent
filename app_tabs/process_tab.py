@@ -8,8 +8,6 @@ from lib.cut_video import cut_video_segments
 from lib.download import zip_and_download_files
 from lib.llm import process_transcription_with_llm
 
-# Set page config
-
 
 def render_process_tab() -> None:
     col1, col2 = st.columns([2, 1])

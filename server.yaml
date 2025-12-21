@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: "Video editing agent"
+
+Parameters:
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t3.small
+
+Resources:
+  VideoInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-08970251d20e940b0
+      InstanceType: !Ref "InstanceType"
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          yum install -y --allowerasing python3.12 python3-pip curl git-all nginx tmux
+      SecurityGroupIds:
+        - !Ref "VideoInstanceSecurityGroup"
+      KeyName: "Keunbae"
+      # BlockDeviceMappings:
+      #   - DeviceName: /dev/xvda
+      #     Ebs:
+      #       VolumeSize: 16
+      Tags:
+        - Value: VideoInstance
+          Key: Name
+
+  VideoInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Video Instance Security Group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: "22"
+          ToPort: "22"
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: "8501"
+          ToPort: "8501"
+          CidrIp: "0.0.0.0/0"
+
+Outputs:
+  ServerIp:
+    Description: IP address of the Video server
+    Value: !GetAtt "VideoInstance.PublicIp"
