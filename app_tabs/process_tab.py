@@ -9,6 +9,29 @@ from lib.download import zip_and_download_files
 from lib.llm import process_transcription_with_llm
 
 
+default_prompt = """Developer: # Role and Objective
+You are a video editing specialist. Your primary responsibility is to select and extract compelling segments from a provided video transcription that are likely to arouse users' interests.
+
+# Instructions
+- Review the provided video transcription carefully.
+- Identify and select segments that are likely to capture user interest or arouse curiosity.
+- Extract sections suitable for creating engaging short video clips.
+
+After selecting the clips, validate that each segment is within the specified duration and meets the engagement criteria before finalizing your output. If a clip does not fit, self-correct your selection.
+
+## Clip Guidelines
+- Each clip should be between 1 and 3 minutes in length.
+- Focus on content that is ideal for social media sharing and designed to pique user interest.
+
+# Context
+- Input: Un-edited video transcription is provided.
+- Output: Selected video snippets based on your extraction.
+
+# Stop Conditions
+- Hand back when you have identified all relevant segments fitting the criteria (1–3 minutes, engaging for users, social-ready, and likely to arouse user interest).
+"""
+
+
 def render_process_tab() -> None:
     col1, col2 = st.columns([2, 1])
 
@@ -23,10 +46,10 @@ def render_process_tab() -> None:
         )
 
         st.subheader("Script Input")
-        user_script = st.text_area(
+        user_prompt = st.text_area(
             "Enter your script:",
-            height=150,
-            placeholder="Enter your script here...",
+            value=default_prompt,
+            height=500,
             help="Provide the script for video editing",
             key="process_video_script",
         )
@@ -38,8 +61,8 @@ def render_process_tab() -> None:
         else:
             st.info("Please select a video file to proceed.")
 
-        if user_script.strip():
-            st.success(f"Script provided: {len(user_script)} characters")
+        if user_prompt.strip():
+            st.success(f"Script provided: {len(user_prompt)} characters")
         else:
             st.info("Add a script or editing instructions above.")
 
@@ -59,12 +82,12 @@ def render_process_tab() -> None:
             key="process_video_run",
         ):
             if uploaded_file is not None:
-                asyncio.run(process_video(uploaded_file, user_script))
+                asyncio.run(process_video(uploaded_file, user_prompt))
             else:
                 st.error("Please select a file first!")
 
 
-async def process_video(uploaded_file, user_script: str):
+async def process_video(uploaded_file, user_prompt: str):
     """Process the uploaded video file."""
     try:
         temp_dir = Path("temp")
@@ -114,7 +137,7 @@ async def process_video(uploaded_file, user_script: str):
         status_text.text("Processing transcription with LLM...")
 
         processed_res = await process_transcription_with_llm(
-            transcription_file_path, user_script
+            transcription_file_path, user_prompt
         )
 
         status_text.text("Cutting video segments...")
