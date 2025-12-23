@@ -12,7 +12,9 @@ class VideoEdit(BaseModel):
     targeted_script_snippet: str
 
 
-async def process_transcription_with_llm(transcript_path: str, prompt: str) -> dict:
+async def process_transcription_with_llm(
+    transcript_path: str, prompt: str, processed_result_path: str
+) -> None:
     try:
         with open(transcript_path, "r", encoding="utf-8") as f:
             transcript = f.read()
@@ -33,10 +35,10 @@ async def process_transcription_with_llm(transcript_path: str, prompt: str) -> d
         elif hasattr(result, "final_output") and result.final_output:
             output_data = result.final_output
         else:
-            return []
+            return
 
         # Save the result as JSON
-        with open("temp/processed_result.json", "w", encoding="utf-8") as f:
+        with open(processed_result_path, "w", encoding="utf-8") as f:
             # Convert VideoEdit objects to dict for JSON serialization
             if isinstance(output_data, list):
                 json_data = [
@@ -46,8 +48,6 @@ async def process_transcription_with_llm(transcript_path: str, prompt: str) -> d
             else:
                 json_data = output_data
             json.dump(json_data, f, ensure_ascii=False, indent=4)
-
-        return output_data
 
     except Exception as e:
         print(f"Error processing transcript: {e}")

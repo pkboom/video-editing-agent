@@ -4,32 +4,16 @@ import traceback
 
 import streamlit as st
 
+from lib.convert import convert_video_to_audio
 from lib.cut_video import cut_video_segments
 from lib.download import zip_and_download_files
 from lib.llm import process_transcription_with_llm
+from lib.transcribe import transcribe_audio
 
+file_path = Path(__file__).parent / "prompt.txt"
 
-default_prompt = """Developer: # Role and Objective
-You are a video editing specialist. Your primary responsibility is to select and extract compelling segments from a provided video transcription that are likely to arouse users' interests.
-
-# Instructions
-- Review the provided video transcription carefully.
-- Identify and select segments that are likely to capture user interest or arouse curiosity.
-- Extract sections suitable for creating engaging short video clips.
-
-After selecting the clips, validate that each segment is within the specified duration and meets the engagement criteria before finalizing your output. If a clip does not fit, self-correct your selection.
-
-## Clip Guidelines
-- Each clip should be between 1 and 3 minutes in length.
-- Focus on content that is ideal for social media sharing and designed to pique user interest.
-
-# Context
-- Input: Un-edited video transcription is provided.
-- Output: Selected video snippets based on your extraction.
-
-# Stop Conditions
-- Hand back when you have identified all relevant segments fitting the criteria (1–3 minutes, engaging for users, social-ready, and likely to arouse user interest).
-"""
+with file_path.open("r", encoding="utf-8") as handle:
+    default_prompt = handle.read()
 
 
 def render_process_tab() -> None:
@@ -107,48 +91,50 @@ async def process_video(uploaded_file, user_prompt: str):
         progress_bar.progress(0.2)
 
         audio_file_path = temp_dir / "audio.wav"
-        # convert_video_to_audio(temp_video_path, audio_file_path)
+        convert_video_to_audio(str(temp_video_path), str(audio_file_path))
 
         # # Debug: Check if audio file was created
-        # if audio_file_path.exists():
-        #     st.success(f"✅ Audio file created: {audio_file_path}")
-        #     st.write(f"Audio file size: {audio_file_path.stat().st_size / 1024:.2f} KB")
-        # else:
-        #     st.error("❌ Audio file was not created")
+        if audio_file_path.exists():
+            st.success(f"✅ Audio file created: {audio_file_path}")
+            st.write(f"Audio file size: {audio_file_path.stat().st_size / 1024:.2f} KB")
+        else:
+            st.error("❌ Audio file was not created")
 
         progress_bar.progress(0.1)
         status_text.text("Transcribing audio...")
 
         # temporary
-        transcription_file_path = str(Path(audio_file_path).with_suffix(".json"))
+        # transcription_file_path = str(Path(audio_file_path).with_suffix(".json"))
 
-        # transcription_file_path = transcribe_audio(audio_file_path)
+        transcription_file_path = transcribe_audio(str(audio_file_path))
 
-        # # Debug: Check if transcription file was created
-        # if Path(transcription_file_path).exists():
-        #     st.success(f"✅ Transcription file created: {transcription_file_path}")
-        #     st.write(
-        #         f"Transcription file size: {Path(transcription_file_path).stat().st_size / 1024:.2f} KB"
-        #     )
-        # else:
-        #     st.error("❌ Transcription file was not created")
+        # Debug: Check if transcription file was created
+        if Path(transcription_file_path).exists():
+            st.success(f"✅ Transcription file created: {transcription_file_path}")
+            st.write(
+                f"Transcription file size: {Path(transcription_file_path).stat().st_size / 1024:.2f} KB"
+            )
+        else:
+            st.error("❌ Transcription file was not created")
 
         progress_bar.progress(0.4)
         status_text.text("Processing transcription with LLM...")
 
-        processed_res = await process_transcription_with_llm(
-            transcription_file_path, user_prompt
+        processed_result_path = temp_dir / "processed_result.json"
+
+        await process_transcription_with_llm(
+            transcription_file_path, user_prompt, str(processed_result_path)
         )
 
         status_text.text("Cutting video segments...")
         progress_bar.progress(0.6)
 
-        await cut_video_segments(temp_video_path, processed_res)
+        await cut_video_segments(str(temp_video_path), str(processed_result_path))
 
         progress_bar.progress(0.9)
         status_text.text("Preparing files for download...")
 
-        zip_file_path = await zip_and_download_files("exports", temp_dir)
+        zip_file_path = await zip_and_download_files("exports", str(temp_dir))
 
         st.session_state.zip_file_path = zip_file_path
 
