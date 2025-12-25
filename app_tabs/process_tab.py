@@ -91,9 +91,8 @@ async def process_video(uploaded_file, user_prompt: str):
         progress_bar.progress(0.2)
 
         audio_file_path = temp_dir / "audio.wav"
-        convert_video_to_audio(str(temp_video_path), str(audio_file_path))
+        convert_video_to_audio(temp_video_path, audio_file_path)
 
-        # # Debug: Check if audio file was created
         if audio_file_path.exists():
             st.success(f"✅ Audio file created: {audio_file_path}")
             st.write(f"Audio file size: {audio_file_path.stat().st_size / 1024:.2f} KB")
@@ -103,12 +102,8 @@ async def process_video(uploaded_file, user_prompt: str):
         progress_bar.progress(0.1)
         status_text.text("Transcribing audio...")
 
-        # temporary
-        # transcription_file_path = str(Path(audio_file_path).with_suffix(".json"))
+        transcription_file_path = transcribe_audio(audio_file_path)
 
-        transcription_file_path = transcribe_audio(str(audio_file_path))
-
-        # Debug: Check if transcription file was created
         if Path(transcription_file_path).exists():
             st.success(f"✅ Transcription file created: {transcription_file_path}")
             st.write(
